@@ -1,6 +1,6 @@
 # Copyright (C) 2019 Guillaume Valadon <guillaume@valadon.net>
 
-# Toshiba MeP SLEIGH specification
+# Toshiba MeP-c4 SLEIGH specification
 
 define endian=little;
 
@@ -32,6 +32,11 @@ define token instr(16)
     rm = (4, 7)
     minor = (0, 3)
     minor8 = (0, 7)
+
+    full_instruction = (0, 15)
+
+    major_5 = (11, 15)
+    imm7 = (4 ,10)
 ;
 
 define token ext(16)
@@ -50,19 +55,39 @@ attach variables [ rn rm ] [
 
 # MOV Rn,Rm - 0000_nnnn_mmmm_0000
 :mov rn, rm is major=0b0000 & rn & rm & minor=0b0000 {
-    rn = rm;
+  rn = rm;
+}
+
+### <Major Opcode #7>
+
+# RET - 0111_0000_0000_0010
+:ret is full_instruction=0b0111000000000010{
+  pc = lp;
+  return [pc];
 }
 
 ### <Major Opcode #12>
 
 # MOV Rn,imm16 - 1100_nnnn_0000_0001 iiii_iiii_iiii_iiii
-:mov rn, imm16 is major=0b1100 & rn & minor=0b00000001 ; imm16 {
-    rn = imm16;
+:mov rn, imm16 is major=0b1100 & rn & minor8=0b00000001 ; imm16 {
+  rn = imm16;
 }
 
 ### <Major Opcode #13>
 
 # MOVU Rn[0-7],imm24 - 1101_0nnn_IIII_IIII iiii_iiii_iiii_iiii
-:movu rn, imm24 is major=0b1101 & rn & minor ; imm16 [ imm24 = minor + (imm16 <<8); ] {
-    rn = imm24;
+:movu rn, imm24 is major=0b1101 & rn & minor ; imm16 [ imm24 = minor + (imm16 << 8); ] {
+  rn = imm24;
+}
+
+# BSR disp24 - 1101_1DDD_DDDD_1001 dddd_dddd_dddd_dddd
+
+# GV: I did not find another way to compute the target address more efficiently 
+disp24: target is major_5=0b11011 & imm7 & minor=0b1001 ; imm16 [ target = inst_start + (imm16 << 8) + (imm7 << 1); ] {
+  export *:4 target;
+}
+
+:bsr disp24 is disp24 {
+  lp = inst_next;
+  call disp24;
 }
