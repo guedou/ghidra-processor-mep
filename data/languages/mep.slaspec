@@ -1,0 +1,68 @@
+# Copyright (C) 2019 Guillaume Valadon <guillaume@valadon.net>
+
+# Toshiba MeP SLEIGH specification
+
+define endian=little;
+
+# Note: size & default are required
+define space ram type=ram_space size=4 wordsize=1 default;
+
+define space register type=register_space size=4;
+
+# General-purpose registers (r0 to r15)
+define register offset=0 size=4 [
+  r0   r1   r2  r3   r4   r5   r6
+  r7   r8   r9  r10  r11  r12  tp 
+  gp   sp
+];
+
+# Control/Special registers name
+define register offset=0x100 size=4 [
+  pc    lp    sar    s3    rpb    rpe
+  rpc   hi    lo     s9    s10    s11
+  mb0   me0   mb1    me1   psw    id
+  tmp   epc   exc    cfg   s22    npc
+  dbg   depc  opt    rcfg  ccfg   s29
+  s30   s31   s32
+];
+
+define token instr(16)
+    major = (12, 15)
+    rn = (8, 11)
+    rm = (4, 7)
+    minor = (0, 3)
+    minor8 = (0, 7)
+;
+
+define token ext(16)
+    imm16 = (0, 15)
+;
+
+# Binds rn rm rl to a real register name
+attach variables [ rn rm ] [
+#attach variables [ rn rm rl ] [
+  r0   r1   r2   r3   r4   r5   r6
+  r7   r8   r9   r10  r11  r12  tp
+  gp   sp
+];
+
+### <Major Opcode #0>
+
+# MOV Rn,Rm - 0000_nnnn_mmmm_0000
+:mov rn, rm is major=0b0000 & rn & rm & minor=0b0000 {
+    rn = rm;
+}
+
+### <Major Opcode #12>
+
+# MOV Rn,imm16 - 1100_nnnn_0000_0001 iiii_iiii_iiii_iiii
+:mov rn, imm16 is major=0b1100 & rn & minor=0b00000001 ; imm16 {
+    rn = imm16;
+}
+
+### <Major Opcode #13>
+
+# MOVU Rn[0-7],imm24 - 1101_0nnn_IIII_IIII iiii_iiii_iiii_iiii
+:movu rn, imm24 is major=0b1101 & rn & minor ; imm16 [ imm24 = minor + (imm16 <<8); ] {
+    rn = imm24;
+}

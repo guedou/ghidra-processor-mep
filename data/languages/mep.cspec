@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!-- Copyright (C) 2019 Guillaume Valadon <guillaume@valadon.net> -->
+
+<!-- Toshiba MeP compiler specification -->
+
+<compiler_spec>
+  <default_proto>
+      <prototype
+        extrapop="0"
+        stackshift="0"
+        name="__stdcall">
+      <!--
+            Notes:
+              - extrapop: bytes popped from the stack pointer across a call
+              - stackshift: bytes popped from the stack across a call
+              - see ghidra.git/Ghidra/Features/Decompiler/src/main/doc/cpsec.xml
+      -->
+      <input>
+      </input>
+      <output>
+      </output>
+    </prototype>
+  </default_proto>
+</compiler_spec>

@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!-- Copyright (C) 2019 Guillaume Valadon <guillaume@valadon.net> -->
+
+<!-- Toshiba MeP language definition -->
+
+<language_definitions>
+  <language processor="Toshiba MeP"
+            endian="little"
+            size="32"
+            variant="default"
+            version="0.1"
+            slafile="mep.sla"
+            processorspec="mep.pspec"
+            id="MEP:LE:32:default">
+    <!--
+          Notes:
+            - size: memory address size
+            - variant: name of the processor variant
+            - id: Ghidra processor identifier as 'processor:endian:size:variant'
+    -->
+    <description>Toshiba MeP, little endian</description>
+    <compiler name="default" spec="mep.cspec" id="default"/>
+  </language>
+</language_definitions>
