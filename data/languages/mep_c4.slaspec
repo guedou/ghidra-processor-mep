@@ -2,6 +2,7 @@
 
 # Toshiba MeP-c4 SLEIGH specification
 
+
 define endian=little;
 
 # Note: size & default are required
@@ -9,15 +10,15 @@ define space ram type=ram_space size=4 wordsize=1 default;
 
 define space register type=register_space size=4;
 
-# General-purpose registers (r0 to r15)
 define register offset=0 size=4 [
+# General-purpose registers (r0 to r15)
   r0   r1   r2  r3   r4   r5   r6
   r7   r8   r9  r10  r11  r12  tp 
   gp   sp
 ];
 
+define register offset=0x16 size=4 [
 # Control/Special registers name
-define register offset=0x100 size=4 [
   pc    lp    sar    s3    rpb    rpe
   rpc   hi    lo     s9    s10    s11
   mb0   me0   mb1    me1   psw    id
@@ -27,29 +28,38 @@ define register offset=0x100 size=4 [
 ];
 
 define token instr(16)
-    major = (12, 15)
-    rn = (8, 11)
-    rm = (4, 7)
-    minor = (0, 3)
-    minor8 = (0, 7)
+  major = (12, 15)
+  rn = (8, 11)
+  rm = (4, 7)
+  minor8 = (0, 7)
+  minor = (0, 3)
+  rl = (0, 3)
 
-    full_instruction = (0, 15)
+  bit0 = (0, 0)
+  imm4 = (4, 7)
+  imm8 = (0, 7)
 
-    major_5 = (11, 15)
-    imm7 = (4 ,10)
+  disp12 = (1, 11)
+
+  full_instruction = (0, 15)
+  imm6 = (2, 7) signed
+  trailer_2 = (0, 1)
+  trailer_3 = (1, 3)
+  major_5 = (11, 15)
+  imm7 = (4 ,10)
 ;
 
 define token ext(16)
-    imm16 = (0, 15)
+  imm16 = (0, 15)
 ;
 
-# Binds rn rm rl to a real register name
-attach variables [ rn rm ] [
-#attach variables [ rn rm rl ] [
+# Binds rn rm to a real register name
+attach variables [ rn rm rl ] [
   r0   r1   r2   r3   r4   r5   r6
   r7   r8   r9   r10  r11  r12  tp
   gp   sp
 ];
+
 
 ### <Major Opcode #0>
 
@@ -58,13 +68,74 @@ attach variables [ rn rm ] [
   rn = rm;
 }
 
+# SW Rn,(Rm) - 0000_nnnn_mmmm_1010
+# Note: the simple quote ' does not work!
+:sw rn, "("^rm^")" is major=0b0000 & rn & rm & minor=0b1010 {
+  *[ram]:4 rm = rn;
+}
+
+# LW Rn,(Rm) - 0000_nnnn_mmmm_1110
+:lw rn, "("^rm^")" is major=0b0000 & rn & rm & minor=0b1110 {
+  rn = *[ram]:4 rm;
+}
+
+
+### <Major Opcode #5>
+
+# MOV Rn,imm8 - 0101_nnnn_iiii_iiii
+:mov rn, imm8 is major=0b0101 & rn & imm8 {
+  rn = imm8;
+}
+
+
+### <Major Opcode #6>
+
+# ADD Rn,imm6 - 0110_nnnn_iiii_ii00
+:add rn, imm6 is major=0b0110 & rn & imm6 & trailer_2=0b00 {
+  # Note: the "+=" operator does not exist!
+  rn = rn + imm6 << 2;
+}
+
+
 ### <Major Opcode #7>
 
 # RET - 0111_0000_0000_0010
-:ret is full_instruction=0b0111000000000010{
+:ret is full_instruction=0b0111000000000010 {
   pc = lp;
   return [pc];
 }
+
+# LDC Rn,imm5 - 0111_nnnn_iiii_101I
+# Note: inspired by xyzz/ghidra-mep
+creg: regid is imm4 & bit0 [ regid = ((bit0 << 4) | imm4) * 4 + 0x16; ]
+{
+  export *[register]:4 regid;
+}
+
+:ldc rn, creg is major=0b0111 & rn & creg & trailer_3=0b101 {
+  rn = creg;
+}
+
+
+### <Major Opcode #9>
+
+# ADD3 Rl,Rn,Rm - 1001_nnnn_mmmm_llll
+:add3 rl, rn, rm is major=0b1001 & rn & rm & rl {
+  rl = rn + rm;
+}
+
+### <Major Opcode #11>
+
+# BSR disp12.align2 - 1011_dddd_dddd_ddd1
+disp12_align2: target is disp12 [ target = inst_start + (disp12 << 1); ] {
+  export *[ram]:4 target;
+}
+
+:bsr disp12_align2 is major=0b1011 & disp12_align2 & bit0=0b1 {
+  lp = inst_next;
+  call disp12_align2;
+}
+
 
 ### <Major Opcode #12>
 
@@ -73,6 +144,7 @@ attach variables [ rn rm ] [
   rn = imm16;
 }
 
+
 ### <Major Opcode #13>
 
 # MOVU Rn[0-7],imm24 - 1101_0nnn_IIII_IIII iiii_iiii_iiii_iiii
@@ -80,14 +152,15 @@ attach variables [ rn rm ] [
   rn = imm24;
 }
 
-# BSR disp24 - 1101_1DDD_DDDD_1001 dddd_dddd_dddd_dddd
 
-# GV: I did not find another way to compute the target address more efficiently 
-disp24: target is major_5=0b11011 & imm7 & minor=0b1001 ; imm16 [ target = inst_start + (imm16 << 8) + (imm7 << 1); ] {
-  export *:4 target;
+### <Major Opcode #14>
+
+# BNE Rn,Rm,disp17 - 1110_nnnn_mmmm_0101 dddd_dddd_dddd_ddd
+disp17: target is imm16 [ target = inst_start + (imm16 << 1 ); ] {
+  export *[ram]:4 target;
+
 }
 
-:bsr disp24 is disp24 {
-  lp = inst_next;
-  call disp24;
+:bne rn, rm, disp17 is major=0b1110 & rn & rm & minor=0b0101 ; disp17 {
+  if (rn != rm) goto disp17;
 }

@@ -2,7 +2,17 @@
  
 ## Description
 
-This repository contains a toy implementation of the Toshiba MeP-c4 for [Ghidra](https://github.com/NationalSecurityAgency/ghidra).
+This repository contains a toy implementation of the Toshiba MeP-c4 processor
+for [Ghidra](https://github.com/NationalSecurityAgency/ghidra).
+
+## Installation
+
+```
+git clone https://github.com/guedou/ghidra-processor-mep
+ln -s /flashre/ghidra-processor-mep/ ${GHIDRA_HOME}/Processors/MEP_C4/
+cd ${GHIDRA_HOME}/Processors/MEP_C4/
+sleigh -ax
+```
 
 ## Notes
 
